@@ -35,9 +35,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    volumes:
-      # Mount source code for live reload during development
-      - ./src:/app/src
     restart: unless-stopped
 
 volumes:

@@ -2,15 +2,18 @@
   "name": "rate-limiter-gateway",
   "version": "1.0.0",
   "description": "A production-quality Rate Limiter API Gateway using Express + Redis — built as a Redis learning project",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "dev:watch": "nodemon --exec ts-node src/index.ts --ext ts",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
     "format": "biome format --write src/",
     "check": "biome check src/",
-    "check:fix": "biome check --write src/"
+    "check:fix": "biome check --write src/",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
@@ -20,7 +23,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
-    "nodemon": "^3.1.9"
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
   },
   "license": "MIT",
   "author": "Pritish Budhiraja",

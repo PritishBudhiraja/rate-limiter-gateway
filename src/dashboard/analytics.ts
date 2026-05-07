@@ -2,27 +2,28 @@
  * Analytics Dashboard
  *
  * Tracks two kinds of data in Redis:
- *   1. Per-algorithm hit counts  → stored in a Redis Hash  "analytics:hits"
- *   2. Blocked request log       → stored in a Sorted Set  "analytics:blocked"
+ *   1. Per-algorithm hit counts  -> stored in a Redis Hash  "analytics:hits"
+ *   2. Blocked request log       -> stored in a Sorted Set  "analytics:blocked"
  *
  * The recording functions are called from the rate limiter middleware on every
  * request. The dashboard route reads all analytics in a single Redis pipeline
  * to minimize round-trips.
  */
 
+import type { Request, Response } from 'express';
+import type { Redis } from 'ioredis';
+import type { Algorithm, BlockedEntry, DashboardResponse } from '../types';
+
 // ═══════════════════════════════════════════════════════════════════════
 // Recording (called from middleware on every request)
 // ═══════════════════════════════════════════════════════════════════════
 
-/**
- * Record a request for analytics purposes.
- *
- * @param {import('ioredis').Redis} client
- * @param {string}  algorithm   — 'fixed', 'sliding', or 'token'
- * @param {string}  identifier  — the client's IP / user ID / API key
- * @param {boolean} allowed     — whether the request was allowed
- */
-async function recordRequest(client, algorithm, identifier, allowed) {
+export async function recordRequest(
+  client: Redis,
+  algorithm: Algorithm,
+  identifier: string,
+  allowed: boolean,
+): Promise<void> {
   // REDIS LEARNING NOTE: HINCRBY key field increment
   // What it does:   Atomically increments a numeric field in a Hash by
   //                 `increment`. If the field or key doesn't exist, Redis
@@ -49,7 +50,7 @@ async function recordRequest(client, algorithm, identifier, allowed) {
     //                 identifiers that we can query with ZREVRANGE.
     // Return value:   Number of NEW members added (0 if the member
     //                 already existed and only its score was updated).
-    const now = Date.now();
+    const now: number = Date.now();
     await client.zadd('analytics:blocked', now, identifier);
   }
 }
@@ -58,22 +59,16 @@ async function recordRequest(client, algorithm, identifier, allowed) {
 // Dashboard route handler
 // ═══════════════════════════════════════════════════════════════════════
 
-/**
- * Returns an Express route handler for GET /dashboard.
- *
- * @param {import('ioredis').Redis} client
- * @returns {Function} Express route handler
- */
-function dashboardHandler(client) {
-  return async (_req, res) => {
+export function dashboardHandler(client: Redis) {
+  return async (_req: Request, res: Response): Promise<void> => {
     try {
       // REDIS LEARNING NOTE: client.pipeline()
-      // What it does:   Creates a pipeline — a buffer that queues multiple
+      // What it does:   Creates a pipeline -- a buffer that queues multiple
       //                 commands and sends them to Redis in a SINGLE TCP
       //                 round-trip, then reads all replies at once.
       // Why used here:  Without a pipeline, each command below would be:
-      //                   send command → wait for reply → send next command
-      //                 That's 3 round-trips (network latency × 3). With a
+      //                   send command -> wait for reply -> send next command
+      //                 That's 3 round-trips (network latency x 3). With a
       //                 pipeline, all 3 commands travel in ONE packet, and
       //                 all 3 replies come back in ONE packet. If Redis is
       //                 on a remote server with 2ms latency, a pipeline
@@ -107,19 +102,24 @@ function dashboardHandler(client) {
       // What it does:   Returns the number of members in a Sorted Set.
       // Why used here:  Tells us how many distinct IPs/users have been
       //                 blocked at least once.
-      // Return value:   Integer — cardinality of the set.
+      // Return value:   Integer -- cardinality of the set.
       pipeline.zcard('analytics:blocked');
 
       // Execute all three commands in one round-trip
       const results = await pipeline.exec();
 
-      // Parse results — each entry is [error, value]
-      const hits = results[0][1] || {};
-      const topBlockedRaw = results[1][1] || [];
-      const uniqueBlocked = results[2][1] || 0;
+      if (!results) {
+        res.status(500).json({ error: 'Pipeline returned no results' });
+        return;
+      }
+
+      // Parse results -- each entry is [error, value]
+      const hits = (results[0][1] as Record<string, string>) || {};
+      const topBlockedRaw = (results[1][1] as string[]) || [];
+      const uniqueBlocked = (results[2][1] as number) || 0;
 
       // Transform the raw ZREVRANGE response into a structured array
-      const topBlocked = [];
+      const topBlocked: BlockedEntry[] = [];
       for (let i = 0; i < topBlockedRaw.length; i += 2) {
         topBlocked.push({
           identifier: topBlockedRaw[i],
@@ -127,7 +127,7 @@ function dashboardHandler(client) {
         });
       }
 
-      res.json({
+      const response: DashboardResponse = {
         summary: {
           totalRequests: parseInt(hits.total, 10) || 0,
           totalBlocked: parseInt(hits.blocked, 10) || 0,
@@ -139,12 +139,12 @@ function dashboardHandler(client) {
           token: parseInt(hits.token, 10) || 0,
         },
         topBlockedIdentifiers: topBlocked,
-      });
+      };
+
+      res.json(response);
     } catch (err) {
-      console.error('[Analytics] Error:', err.message);
+      console.error('[Analytics] Error:', (err as Error).message);
       res.status(500).json({ error: 'Failed to fetch analytics' });
     }
   };
 }
-
-module.exports = { recordRequest, dashboardHandler };

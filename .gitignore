@@ -29,6 +29,9 @@ appendonly.aof
 # Docker volumes (if mounted locally)
 redis-data/
 
+# TypeScript build output
+dist/
+
 # Coverage / test output
 coverage/
 .nyc_output/

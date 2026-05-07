@@ -33,8 +33,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npm run typecheck
+
       - name: Lint and format check
         run: npx biome check src/
+
+      - name: Build
+        run: npm run build
 
       - name: Verify app starts
         env:
@@ -42,7 +48,7 @@ jobs:
           REDIS_PORT: 6379
           PORT: 3000
         run: |
-          node src/index.js &
+          node dist/index.js &
           sleep 3
           curl -f http://localhost:3000/public
           curl -f http://localhost:3000/api/data

@@ -4,57 +4,59 @@
  * Returns an Express middleware that applies rate limiting using one of
  * three algorithms: fixed window, sliding window log, or token bucket.
  *
- * Supports "stacking" — you can apply multiple instances (e.g. per-IP burst
+ * Supports "stacking" -- you can apply multiple instances (e.g. per-IP burst
  * limit AND per-user sustained limit) on the same route. Each middleware
  * runs independently; the first one to block wins.
  */
 
-const { fixedWindowCheck } = require('../limiters/fixedWindow');
-const { slidingWindowLogCheck } = require('../limiters/slidingWindowLog');
-const { tokenBucketCheck } = require('../limiters/tokenBucket');
-const { recordRequest } = require('../dashboard/analytics');
+import type { NextFunction, Response } from 'express';
+import { recordRequest } from '../dashboard/analytics';
+import { fixedWindowCheck } from '../limiters/fixedWindow';
+import { slidingWindowLogCheck } from '../limiters/slidingWindowLog';
+import { tokenBucketCheck } from '../limiters/tokenBucket';
+import type {
+  AuthenticatedRequest,
+  RateLimiterOptions,
+  RateLimitResult,
+  RedisWithLua,
+} from '../types';
 
-/**
- * @param {import('ioredis').Redis} client — ioredis instance
- * @param {Object} options
- * @param {'fixed'|'sliding'|'token'} options.algorithm   — which limiter to use
- * @param {'ip'|'user'|'apikey'}      options.keyBy       — how to identify the client
- * @param {number}                    options.maxRequests  — requests (or tokens) per window
- * @param {number}                    options.windowSeconds — window duration in seconds
- * @returns {Function} Express middleware
- */
-function rateLimiter(client, options) {
+export function rateLimiter(client: RedisWithLua, options: RateLimiterOptions) {
   const { algorithm, keyBy, maxRequests, windowSeconds } = options;
 
-  return async (req, res, next) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     // ── Extract the client identifier ─────────────────────────────────
-    let identifier;
+    let rawIdentifier: string | undefined;
 
     switch (keyBy) {
       case 'ip':
         // req.ip respects the X-Forwarded-For header when trust proxy is on
-        identifier = req.ip;
+        rawIdentifier = req.ip;
         break;
       case 'user':
         // Assumes authentication middleware has set req.user upstream
-        identifier = req.user?.id;
-        if (!identifier) {
-          return res.status(401).json({ error: 'Authentication required' });
+        rawIdentifier = req.user?.id;
+        if (!rawIdentifier) {
+          res.status(401).json({ error: 'Authentication required' });
+          return;
         }
         break;
       case 'apikey':
-        identifier = req.headers['x-api-key'];
-        if (!identifier) {
-          return res.status(401).json({ error: 'API key required (X-API-Key header)' });
+        rawIdentifier = req.headers['x-api-key'] as string | undefined;
+        if (!rawIdentifier) {
+          res.status(401).json({ error: 'API key required (X-API-Key header)' });
+          return;
         }
         break;
       default:
-        identifier = req.ip;
+        rawIdentifier = req.ip;
     }
+
+    const identifier: string = rawIdentifier || 'unknown';
 
     try {
       // ── Run the selected algorithm ────────────────────────────────
-      let result;
+      let result: RateLimitResult;
 
       switch (algorithm) {
         case 'fixed':
@@ -67,7 +69,7 @@ function rateLimiter(client, options) {
           result = await tokenBucketCheck(client, identifier, maxRequests, windowSeconds);
           break;
         default:
-          throw new Error(`Unknown algorithm: ${algorithm}`);
+          throw new Error(`Unknown algorithm: ${algorithm satisfies never}`);
       }
 
       // ── Record analytics for every request ────────────────────────
@@ -84,27 +86,26 @@ function rateLimiter(client, options) {
 
       if (!result.allowed) {
         // Calculate seconds until the limit resets
-        const retryAfter = Math.max(1, result.resetAt - Math.floor(Date.now() / 1000));
+        const retryAfter: number = Math.max(1, result.resetAt - Math.floor(Date.now() / 1000));
 
         res.set('Retry-After', String(retryAfter));
 
-        return res.status(429).json({
+        res.status(429).json({
           error: 'Too Many Requests',
           message: `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
           retryAfter,
           limit: maxRequests,
           remaining: 0,
         });
+        return;
       }
 
       next();
     } catch (err) {
       // If Redis is down, we fail open (allow the request) rather than
       // blocking all traffic. In production you might want to fail closed.
-      console.error('[RateLimiter] Error:', err.message);
+      console.error('[RateLimiter] Error:', (err as Error).message);
       next();
     }
   };
 }
-
-module.exports = { rateLimiter };

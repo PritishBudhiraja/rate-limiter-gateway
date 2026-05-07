@@ -1,15 +1,16 @@
-const Redis = require('ioredis');
-const fs = require('node:fs');
-const path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
+import Redis from 'ioredis';
+import type { RedisWithLua } from '../types';
 
 // REDIS LEARNING NOTE: ioredis is a robust, feature-rich Redis client for
 // Node.js. It supports Cluster, Sentinel, pipelining, Lua scripting, and
 // Pub/Sub out of the box. We use it instead of the basic "redis" package
 // because defineCommand() lets us register Lua scripts as first-class methods.
 
-const client = new Redis({
+const client: RedisWithLua = new Redis({
   host: process.env.REDIS_HOST || '127.0.0.1',
-  port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+  port: parseInt(process.env.REDIS_PORT || '6379', 10),
 
   // REDIS LEARNING NOTE: maxRetriesPerRequest = null tells ioredis to keep
   // retrying failed commands indefinitely rather than rejecting promises
@@ -22,7 +23,7 @@ const client = new Redis({
   // accept commands (e.g. after an AOF/RDB load). Without this, early
   // commands could fail with LOADING errors.
   enableReadyCheck: true,
-});
+}) as RedisWithLua;
 
 // ─── Connection event listeners ─────────────────────────────────────────
 
@@ -43,7 +44,7 @@ client.on('ready', () => {
 // REDIS LEARNING NOTE: 'error' fires on any connection or command-level
 // error. ioredis will automatically attempt to reconnect, but we log the
 // error for visibility.
-client.on('error', (err) => {
+client.on('error', (err: Error) => {
   console.error('[Redis] Connection error:', err.message);
 });
 
@@ -65,7 +66,7 @@ client.on('close', () => {
 // This means the full script text is only sent over the network once;
 // subsequent calls use the compact SHA — saving bandwidth.
 
-const slidingWindowLua = fs.readFileSync(
+const slidingWindowLua: string = fs.readFileSync(
   path.join(__dirname, '..', 'scripts', 'slidingWindow.lua'),
   'utf8',
 );
@@ -75,9 +76,7 @@ client.defineCommand('slidingwindow', {
   lua: slidingWindowLua,
 });
 
-// Token bucket Lua script — defined inline in tokenBucket.js but also
-// registered here so it's available globally.
-const tokenBucketLua = fs.readFileSync(
+const tokenBucketLua: string = fs.readFileSync(
   path.join(__dirname, '..', 'scripts', 'tokenBucket.lua'),
   'utf8',
 );
@@ -87,4 +86,4 @@ client.defineCommand('tokenbucket', {
   lua: tokenBucketLua,
 });
 
-module.exports = client;
+export default client;
