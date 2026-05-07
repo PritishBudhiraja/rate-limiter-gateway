@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  # ───────────────────────────────────────────
+  # Redis 7 — our in-memory data store
+  # ───────────────────────────────────────────
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      # Persist Redis data across container restarts
+      - redis-data:/data
+      # Mount our custom config (maxmemory, eviction policy)
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ───────────────────────────────────────────
+  # Node.js Express application
+  # ───────────────────────────────────────────
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=3000
+      - NODE_ENV=development
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount source code for live reload during development
+      - ./src:/app/src
+    restart: unless-stopped
+
+volumes:
+  redis-data:

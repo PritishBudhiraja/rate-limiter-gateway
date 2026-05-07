@@ -1,0 +1,34 @@
+{
+  "name": "rate-limiter-gateway",
+  "version": "1.0.0",
+  "description": "A production-quality Rate Limiter API Gateway using Express + Redis — built as a Redis learning project",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ioredis": "^5.4.2",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "license": "MIT",
+  "author": "Pritish Budhiraja",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pritishbudhiraja/rate-limiter-gateway"
+  },
+  "keywords": [
+    "rate-limiter",
+    "redis",
+    "express",
+    "api-gateway",
+    "token-bucket",
+    "sliding-window",
+    "lua-scripting"
+  ]
+}
