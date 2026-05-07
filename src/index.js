@@ -58,7 +58,7 @@ app.get(
       algorithm: 'Sliding Window Log',
       note: 'This route allows 10 requests per minute per IP.',
     });
-  }
+  },
 );
 
 // ── GET /api/user — Fixed Window, 100 req/min per user ──────────────
@@ -85,7 +85,7 @@ app.get(
       algorithm: 'Fixed Window',
       note: 'This route allows 100 requests per minute per user.',
     });
-  }
+  },
 );
 
 // ── GET /api/protected — Stacked limits (per-IP burst + per-user) ───
@@ -113,7 +113,7 @@ app.get(
       message: `Protected resource for ${req.user.name}`,
       note: 'This route has TWO stacked rate limiters: per-IP burst (token bucket, 20/10s) and per-user sustained (fixed window, 100/min).',
     });
-  }
+  },
 );
 
 // ── GET /dashboard — Analytics ──────────────────────────────────────

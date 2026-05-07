@@ -40,12 +40,12 @@ async function slidingWindowLogCheck(client, identifier, maxRequests, windowSeco
   // concurrent requests arrive, Redis executes each script invocation
   // one at a time, so counts are always accurate.
   const result = await client.slidingwindow(
-    key,               // KEYS[1]
-    now,               // ARGV[1] — current timestamp in ms
-    windowMs,          // ARGV[2] — window size in ms
-    maxRequests,       // ARGV[3] — max requests allowed
-    uniqueMember,      // ARGV[4] — unique member for ZADD
-    windowSeconds * 2  // ARGV[5] — TTL (2× window for safety margin)
+    key, // KEYS[1]
+    now, // ARGV[1] — current timestamp in ms
+    windowMs, // ARGV[2] — window size in ms
+    maxRequests, // ARGV[3] — max requests allowed
+    uniqueMember, // ARGV[4] — unique member for ZADD
+    windowSeconds * 2, // ARGV[5] — TTL (2× window for safety margin)
   );
 
   // Lua returns an array: [allowed (0|1), currentCount, resetAtMs]

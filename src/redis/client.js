@@ -1,6 +1,6 @@
 const Redis = require('ioredis');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // REDIS LEARNING NOTE: ioredis is a robust, feature-rich Redis client for
 // Node.js. It supports Cluster, Sentinel, pipelining, Lua scripting, and
@@ -67,7 +67,7 @@ client.on('close', () => {
 
 const slidingWindowLua = fs.readFileSync(
   path.join(__dirname, '..', 'scripts', 'slidingWindow.lua'),
-  'utf8'
+  'utf8',
 );
 
 client.defineCommand('slidingwindow', {
@@ -79,7 +79,7 @@ client.defineCommand('slidingwindow', {
 // registered here so it's available globally.
 const tokenBucketLua = fs.readFileSync(
   path.join(__dirname, '..', 'scripts', 'tokenBucket.lua'),
-  'utf8'
+  'utf8',
 );
 
 client.defineCommand('tokenbucket', {

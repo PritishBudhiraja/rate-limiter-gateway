@@ -34,11 +34,11 @@ async function tokenBucketCheck(client, identifier, maxTokens, windowSeconds) {
   // atomically: read current tokens → calculate refill → consume 1
   // → write back. This prevents double-spending under concurrency.
   const result = await client.tokenbucket(
-    key,                // KEYS[1]
-    now,                // ARGV[1] — current timestamp in ms
-    maxTokens,          // ARGV[2] — bucket capacity
-    refillRate,         // ARGV[3] — tokens per second
-    windowSeconds * 2   // ARGV[4] — TTL (2× window for safety margin)
+    key, // KEYS[1]
+    now, // ARGV[1] — current timestamp in ms
+    maxTokens, // ARGV[2] — bucket capacity
+    refillRate, // ARGV[3] — tokens per second
+    windowSeconds * 2, // ARGV[4] — TTL (2× window for safety margin)
   );
 
   // Lua returns: [allowed (0|1), remainingTokens, resetAtMs]
