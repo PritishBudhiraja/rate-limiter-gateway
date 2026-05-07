@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify app starts
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          PORT: 3000
+        run: |
+          node src/index.js &
+          sleep 3
+          curl -f http://localhost:3000/public
+          curl -f http://localhost:3000/api/data
+          curl -f http://localhost:3000/dashboard
+          kill %1
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t rate-limiter-gateway .
+
+      - name: Start with docker-compose
+        run: |
+          docker compose up -d
+          sleep 5
+          curl -f http://localhost:3000/public
+          docker compose down
